@@ -633,6 +633,7 @@ nav a:hover { color: #ffbd70; }
 .class-button-dark { background: var(--class-ink); color: #fff; }
 .class-button-light { color: var(--class-ink); background: transparent; }
 .class-button-light:hover { background: rgba(255,255,255,.45); }
+.class-button[hidden], .gallery-admin-control[hidden] { display: none !important; }
 
 .class-home nav {
   padding: 10px 16px;
