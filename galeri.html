@@ -37,7 +37,9 @@
             <span class="section-eyebrow">CERITA KELAS KAMI</span>
             <h2>Foto-Foto Kami</h2>
           </div>
-          <button class="class-button class-button-dark" id="addPhotoBtn" type="button">Tambah Foto</button>
+          <button class="class-button class-button-light" id="adminLoginBtn" type="button">Admin</button>
+          <button class="class-button class-button-light" id="adminLogoutBtn" type="button" hidden>Keluar admin</button>
+          <button class="class-button class-button-dark" id="addPhotoBtn" type="button" hidden>Tambah Foto</button>
           <input id="galleryImageInput" type="file" accept="image/*" multiple hidden />
         </div>
         <div class="class-gallery" id="classGallery" aria-live="polite"></div>
@@ -69,6 +71,7 @@
   <script src="class-ui.js"></script>
   <script>
     const STORAGE_KEY = 'mi25r1-class-gallery';
+    const GALLERY_API = '/.netlify/functions/gallery';
     const defaultPhotos = [
       {
         src: 'assets/fotokamii.jpeg',
@@ -126,6 +129,9 @@
       }
     ];
 
+    let galleryPhotos = [];
+    let adminPassword = '';
+
     function normalizePhoto(photo) {
       return {
         src: photo.src,
@@ -135,7 +141,17 @@
       };
     }
 
-    function getSavedPhotos() {
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (character) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[character]);
+    }
+
+    function getLocalPhotos() {
       try {
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
         if (stored && !Array.isArray(stored) && stored.version === 2 && Array.isArray(stored.photos)) {
@@ -149,70 +165,109 @@
       }
     }
 
-    function savePhotos(photos) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, photos }));
+    async function savePhotos(photos) {
+      if (!adminPassword) throw new Error('Masuk mode admin untuk menyimpan galeri.');
+
+      const response = await fetch(GALLERY_API, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminPassword}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ photos })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Galeri gagal disimpan.');
+
+      galleryPhotos = photos;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, photos }));
+      } catch (error) {
+        console.warn('Galeri tersimpan di server, cache lokal tidak tersedia.', error);
+      }
+    }
+
+    function updateAdminControls() {
+      const isAdmin = Boolean(adminPassword);
+      document.getElementById('adminLoginBtn').hidden = isAdmin;
+      document.getElementById('adminLogoutBtn').hidden = !isAdmin;
+      document.getElementById('addPhotoBtn').hidden = !isAdmin;
+      document.querySelectorAll('.gallery-admin-control').forEach((button) => {
+        button.hidden = !isAdmin;
+      });
     }
 
     async function loadGallery() {
       const gallery = document.getElementById('classGallery');
       if (!gallery) return;
 
-      const photos = getSavedPhotos();
+      try {
+        const response = await fetch(GALLERY_API, { cache: 'no-store' });
+        if (!response.ok) throw new Error('Galeri bersama tidak tersedia.');
+        const result = await response.json();
+        galleryPhotos = Array.isArray(result.photos)
+          ? result.photos.map(normalizePhoto)
+          : getLocalPhotos();
+      } catch (error) {
+        galleryPhotos = getLocalPhotos();
+      }
 
-      gallery.innerHTML = photos.map((photo, index) => `
+      gallery.innerHTML = galleryPhotos.map((photo, index) => `
         <figure class="gallery-card" data-gallery-index="${index}">
           <div class="gallery-image-wrap">
-            <img src="${photo.src}" alt="${photo.alt}" data-gallery-index="${index}" data-title="${photo.title}" data-caption="${photo.caption}" loading="lazy" />
-            <button class="gallery-delete-btn" type="button" data-delete-index="${index}" aria-label="Hapus foto ${photo.title}">×</button>
+            <img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.alt)}" data-gallery-index="${index}" data-title="${escapeHtml(photo.title)}" data-caption="${escapeHtml(photo.caption)}" loading="lazy" />
+            <button class="gallery-delete-btn gallery-admin-control" type="button" data-delete-index="${index}" aria-label="Hapus foto ${escapeHtml(photo.title)}" hidden>×</button>
           </div>
           <figcaption>
-            <strong>${photo.title}</strong>
-            <span>${photo.caption}</span>
-            <button class="gallery-edit-btn" type="button" data-edit-index="${index}">Edit</button>
+            <strong>${escapeHtml(photo.title)}</strong>
+            <span>${escapeHtml(photo.caption)}</span>
+            <button class="gallery-edit-btn gallery-admin-control" type="button" data-edit-index="${index}" hidden>Edit</button>
           </figcaption>
         </figure>
       `).join('');
 
-      gallery.querySelectorAll('.gallery-delete-btn').forEach((button) => {
-        button.addEventListener('click', (event) => {
-          const targetIndex = Number(event.currentTarget.dataset.deleteIndex);
-          const allPhotos = getSavedPhotos();
-          const updatedPhotos = allPhotos.filter((_, index) => index !== targetIndex);
+      updateAdminControls();
 
-          savePhotos(updatedPhotos);
-          loadGallery();
+      gallery.querySelectorAll('.gallery-delete-btn').forEach((button) => {
+        button.addEventListener('click', async (event) => {
+          const targetIndex = Number(event.currentTarget.dataset.deleteIndex);
+          try {
+            await savePhotos(galleryPhotos.filter((_, index) => index !== targetIndex));
+            await loadGallery();
+          } catch (error) {
+            alert(error.message);
+          }
         });
       });
 
       gallery.querySelectorAll('.gallery-edit-btn').forEach((button) => {
-        button.addEventListener('click', (event) => {
+        button.addEventListener('click', async (event) => {
           const targetIndex = Number(event.currentTarget.dataset.editIndex);
-          const allPhotos = getSavedPhotos();
-          const selectedPhoto = allPhotos[targetIndex];
-
+          const selectedPhoto = galleryPhotos[targetIndex];
           if (!selectedPhoto) return;
 
-          const updatedTitle = window.prompt('Edit judul foto:', selectedPhoto.title || 'Foto kelas MI.25.R1');
+          const updatedTitle = window.prompt('Edit judul foto:', selectedPhoto.title);
           if (updatedTitle === null) return;
-
-          const updatedCaption = window.prompt('Edit deskripsi foto:', selectedPhoto.caption || 'Foto ini menampilkan kegiatan kelas kami.');
+          const updatedCaption = window.prompt('Edit deskripsi foto:', selectedPhoto.caption);
           if (updatedCaption === null) return;
 
           const updatedPhoto = {
             ...selectedPhoto,
-            title: updatedTitle.trim() || selectedPhoto.title || 'Foto kelas MI.25.R1',
-            caption: updatedCaption.trim() || selectedPhoto.caption || 'Foto ini menampilkan kegiatan kelas kami.'
+            title: updatedTitle.trim() || selectedPhoto.title,
+            caption: updatedCaption.trim() || selectedPhoto.caption
           };
+          const nextPhotos = galleryPhotos.map((photo, index) => index === targetIndex ? updatedPhoto : photo);
 
-          const nextPhotos = allPhotos.map((photo, index) => index === targetIndex ? updatedPhoto : photo);
-          savePhotos(nextPhotos);
-          loadGallery();
+          try {
+            await savePhotos(nextPhotos);
+            await loadGallery();
+          } catch (error) {
+            alert(error.message);
+          }
         });
       });
 
-      if (typeof window.refreshGallery === 'function') {
-        window.refreshGallery();
-      }
+      if (typeof window.refreshGallery === 'function') window.refreshGallery();
     }
 
     async function compressImage(file) {
@@ -235,29 +290,56 @@
       return canvas.toDataURL('image/jpeg', 0.82);
     }
 
-    function addPhotoFiles(files) {
-      const savedPhotos = getSavedPhotos();
+    async function addPhotoFiles(files) {
       const titlePrompt = window.prompt('Judul foto (opsional):', 'Foto kelas MI.25.R1');
+      if (titlePrompt === null) return;
       const captionPrompt = window.prompt('Deskripsi foto:', 'Foto ini menampilkan kegiatan kelas kami saat sedang belajar bersama.');
-      const fileReaders = Array.from(files)
-        .filter((file) => file.type.startsWith('image/'))
-        .map(async (file) => ({
+      if (captionPrompt === null) return;
+
+      try {
+        const newPhotos = await Promise.all(Array.from(files)
+          .filter((file) => file.type.startsWith('image/'))
+          .map(async (file) => ({
             src: await compressImage(file),
             alt: file.name.replace(/\.[^/.]+$/, '') || 'Foto kelas MI.25.R1',
-            title: titlePrompt?.trim() || 'Foto kelas MI.25.R1',
-            caption: captionPrompt?.trim() || 'Foto ini menampilkan kegiatan kelas kami saat sedang belajar bersama.'
-          }));
+            title: titlePrompt.trim() || 'Foto kelas MI.25.R1',
+            caption: captionPrompt.trim() || 'Foto ini menampilkan kegiatan kelas kami saat sedang belajar bersama.'
+          })));
 
-      Promise.all(fileReaders)
-        .then((newPhotos) => {
-          const merged = [...savedPhotos, ...newPhotos.map(normalizePhoto)];
-          savePhotos(merged);
-          loadGallery();
-        })
-        .catch(() => {
-          alert('Beberapa foto gagal ditambahkan. Coba pilih file gambar lagi.');
-        });
+        await savePhotos([...galleryPhotos, ...newPhotos.map(normalizePhoto)]);
+        await loadGallery();
+      } catch (error) {
+        alert(error.message || 'Beberapa foto gagal ditambahkan. Coba pilih file gambar lagi.');
+      }
     }
+
+    document.getElementById('adminLoginBtn')?.addEventListener('click', async () => {
+      const password = window.prompt('Password admin galeri:');
+      if (!password) return;
+
+      try {
+        const response = await fetch(GALLERY_API, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${password}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ action: 'verify' })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Login admin gagal.');
+
+        adminPassword = password;
+        updateAdminControls();
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    document.getElementById('adminLogoutBtn')?.addEventListener('click', () => {
+      adminPassword = '';
+      updateAdminControls();
+    });
 
     document.getElementById('addPhotoBtn')?.addEventListener('click', () => {
       document.getElementById('galleryImageInput')?.click();
