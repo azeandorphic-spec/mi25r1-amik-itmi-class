@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Situs kelas MI.25.R1 AMIK ITMI, Program Studi Manajemen Informatika. Kenali kelas, dosen pengampu, dan galeri foto kami." />
+  <meta name="theme-color" content="#ffe000" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="MI.25.R1 AMIK ITMI | Kelas Manajemen Informatika" />
+  <meta property="og:description" content="Kenali kelas MI.25.R1 AMIK ITMI, dosen pengampu, dan momen kebersamaan kami." />
+  <title>MI.25.R1 AMIK ITMI | Kelas Manajemen Informatika</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="class-home">
+  <header id="home">
+    <a class="campus-logo" href="index.html" aria-label="MI.25.R1 AMIK ITMI">
+      <img src="assets/logokampus.png" alt="Logo AMIK ITMI" />
+    </a>
+    <div class="class-hero-content">
+      <span class="class-kicker">AMIK ITMI</span>
+      <h1>Welcome to <span>MI.25.R1 AMIK ITMI</span></h1>
+      <div class="class-lecturer-top">
+        <span class="section-eyebrow">Dosen Pengampu</span>
+        <p>RAJA ANAN NASUTION,<br />S.KOM, M.KOM</p>
+      </div>
+      <p>Manajemen Informatika</p>
+      <div class="class-hero-actions">
+        <a class="class-button class-button-dark" href="tentang.html">About Us</a>
+        <a class="class-button class-button-light" href="galeri.html">Lihat Galeri</a>
+      </div>
+    </div>
+  </header>
+
+  <nav aria-label="Navigasi utama">
+    <a href="index.html" aria-current="page">Home</a>
+    <a href="tentang.html">About Us</a>
+    <a href="galeri.html">Galeri</a>
+  </nav>
+
+  <main>
+    <section class="class-section about-section">
+      <div class="class-section-inner">
+        <span class="section-eyebrow">MI.25.R1 AMIK ITMI</span>
+        <h2>About Us</h2>
+        <p class="about-intro">Kami adalah mahasiswa kelas MI.25.R1 AMIK ITMI, program studi Manajemen Informatika. Di sini kamu bisa mengenal kelas, dosen pengampu, dan momen kebersamaan kami.</p>
+        <img class="class-banner class-banner-blurred" src="assets/fotokamii.jpeg" alt="Foto bersama mahasiswa dan mahasiswi kelas MI.25.R1" />
+        <a class="class-button class-button-dark class-more-link" href="tentang.html">Kenali Kelas Kami</a>
+      </div>
+    </section>
+
+    <section class="class-section gallery-section">
+      <div class="class-section-inner">
+        <span class="section-eyebrow">CERITA KELAS KAMI</span>
+        <h2>Galeri</h2>
+        <div class="gallery-preview-grid">
+          <img src="assets/fotokami6.jpg" alt="Momen kelas MI.25.R1" loading="lazy" />
+          <img src="assets/fotokami8.jpg" alt="Momen kelas MI.25.R1" loading="lazy" />
+          <img src="assets/fotokami9.jpg" alt="Momen kelas MI.25.R1" loading="lazy" />
+        </div>
+        <a class="class-button class-button-dark class-more-link" href="galeri.html">Lihat Semua Foto</a>
+      </div>
+    </section>
+  </main>
+
+  <div class="class-music-player" aria-label="Pemutar musik kelas">
+    <audio id="storeMusic" loop preload="metadata"></audio>
+    <button class="music-toggle" id="musicToggle" type="button" aria-pressed="false">Putar musik</button>
+  </div>
+
+  <footer>
+    <p>&copy; 2026 MI.25.R1 AMIK ITMI</p>
+  </footer>
+  <script src="class-ui.js"></script>
+  <script src="music.js"></script>
+</body>
+</html>

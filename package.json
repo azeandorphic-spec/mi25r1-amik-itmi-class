@@ -1,0 +1,10 @@
+{
+  "name": "mi25r1-amik-itmi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Situs kelas MI.25.R1 AMIK ITMI",
+  "scripts": {
+    "start": "node server.js",
+    "build": "node build-site.js"
+  }
+}
