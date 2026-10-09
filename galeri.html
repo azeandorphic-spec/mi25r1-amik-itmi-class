@@ -137,19 +137,27 @@
 
     function getSavedPhotos() {
       try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-        return Array.isArray(saved) ? saved.map(normalizePhoto) : [];
+        const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+        if (stored && !Array.isArray(stored) && stored.version === 2 && Array.isArray(stored.photos)) {
+          return stored.photos.map(normalizePhoto);
+        }
+
+        const uploadedPhotos = Array.isArray(stored) ? stored.map(normalizePhoto) : [];
+        return [...uploadedPhotos, ...defaultPhotos.map(normalizePhoto)];
       } catch (error) {
-        return [];
+        return defaultPhotos.map(normalizePhoto);
       }
+    }
+
+    function savePhotos(photos) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, photos }));
     }
 
     async function loadGallery() {
       const gallery = document.getElementById('classGallery');
       if (!gallery) return;
 
-      const savedPhotos = getSavedPhotos();
-      const photos = [...savedPhotos, ...defaultPhotos.map(normalizePhoto)];
+      const photos = getSavedPhotos();
 
       gallery.innerHTML = photos.map((photo, index) => `
         <figure class="gallery-card" data-gallery-index="${index}">
@@ -168,11 +176,10 @@
       gallery.querySelectorAll('.gallery-delete-btn').forEach((button) => {
         button.addEventListener('click', (event) => {
           const targetIndex = Number(event.currentTarget.dataset.deleteIndex);
-          const currentPhotos = getSavedPhotos();
-          const allPhotos = [...currentPhotos, ...defaultPhotos.map(normalizePhoto)];
+          const allPhotos = getSavedPhotos();
           const updatedPhotos = allPhotos.filter((_, index) => index !== targetIndex);
 
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedPhotos.filter((photo) => photo.src.startsWith('data:image'))));
+          savePhotos(updatedPhotos);
           loadGallery();
         });
       });
@@ -180,8 +187,7 @@
       gallery.querySelectorAll('.gallery-edit-btn').forEach((button) => {
         button.addEventListener('click', (event) => {
           const targetIndex = Number(event.currentTarget.dataset.editIndex);
-          const currentPhotos = getSavedPhotos();
-          const allPhotos = [...currentPhotos, ...defaultPhotos.map(normalizePhoto)];
+          const allPhotos = getSavedPhotos();
           const selectedPhoto = allPhotos[targetIndex];
 
           if (!selectedPhoto) return;
@@ -199,7 +205,7 @@
           };
 
           const nextPhotos = allPhotos.map((photo, index) => index === targetIndex ? updatedPhoto : photo);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(nextPhotos.filter((photo) => photo.src.startsWith('data:image'))));
+          savePhotos(nextPhotos);
           loadGallery();
         });
       });
@@ -209,28 +215,43 @@
       }
     }
 
+    async function compressImage(file) {
+      const bitmap = await createImageBitmap(file);
+      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(bitmap.width * scale);
+      canvas.height = Math.round(bitmap.height * scale);
+      const context = canvas.getContext('2d');
+
+      if (!context) {
+        bitmap.close();
+        throw new Error('Browser tidak dapat memproses gambar.');
+      }
+
+      context.fillStyle = '#fff';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      bitmap.close();
+      return canvas.toDataURL('image/jpeg', 0.82);
+    }
+
     function addPhotoFiles(files) {
       const savedPhotos = getSavedPhotos();
       const titlePrompt = window.prompt('Judul foto (opsional):', 'Foto kelas MI.25.R1');
       const captionPrompt = window.prompt('Deskripsi foto:', 'Foto ini menampilkan kegiatan kelas kami saat sedang belajar bersama.');
       const fileReaders = Array.from(files)
         .filter((file) => file.type.startsWith('image/'))
-        .map((file) => new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve({
-            src: reader.result,
+        .map(async (file) => ({
+            src: await compressImage(file),
             alt: file.name.replace(/\.[^/.]+$/, '') || 'Foto kelas MI.25.R1',
             title: titlePrompt?.trim() || 'Foto kelas MI.25.R1',
             caption: captionPrompt?.trim() || 'Foto ini menampilkan kegiatan kelas kami saat sedang belajar bersama.'
-          });
-          reader.onerror = () => reject(new Error('Gagal membaca foto'));
-          reader.readAsDataURL(file);
-        }));
+          }));
 
       Promise.all(fileReaders)
         .then((newPhotos) => {
           const merged = [...savedPhotos, ...newPhotos.map(normalizePhoto)];
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          savePhotos(merged);
           loadGallery();
         })
         .catch(() => {
