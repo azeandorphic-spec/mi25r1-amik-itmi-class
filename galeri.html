@@ -131,6 +131,7 @@
 
     let galleryPhotos = [];
     let adminPassword = '';
+    let galleryDataIsShared = false;
 
     function normalizePhoto(photo) {
       return {
@@ -180,6 +181,7 @@
       if (!response.ok) throw new Error(result.error || 'Galeri gagal disimpan.');
 
       galleryPhotos = photos;
+      galleryDataIsShared = true;
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 2, photos }));
       } catch (error) {
@@ -205,10 +207,10 @@
         const response = await fetch(GALLERY_API, { cache: 'no-store' });
         if (!response.ok) throw new Error('Galeri bersama tidak tersedia.');
         const result = await response.json();
-        galleryPhotos = Array.isArray(result.photos)
-          ? result.photos.map(normalizePhoto)
-          : getLocalPhotos();
+        galleryDataIsShared = Array.isArray(result.photos);
+        galleryPhotos = galleryDataIsShared ? result.photos.map(normalizePhoto) : getLocalPhotos();
       } catch (error) {
+        galleryDataIsShared = false;
         galleryPhotos = getLocalPhotos();
       }
 
@@ -330,8 +332,11 @@
         if (!response.ok) throw new Error(result.error || 'Login admin gagal.');
 
         adminPassword = password;
+        if (!galleryDataIsShared) await savePhotos(galleryPhotos);
         updateAdminControls();
       } catch (error) {
+        adminPassword = '';
+        updateAdminControls();
         alert(error.message);
       }
     });
